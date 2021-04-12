@@ -14,3 +14,6 @@ class File(peewee.Model):
 
     class Meta:
         database = db
+
+
+db.connect()
