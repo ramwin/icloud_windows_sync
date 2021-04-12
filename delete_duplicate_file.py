@@ -37,7 +37,7 @@ def main(act=False):
         # print(f"处理{line}")
         cnt += 1
         if cnt % 100 == 0:
-            logging.info("当前处理了 {cnt}")
+            print(f"当前处理了 {cnt}")
         sha, path_str = re.split(r" [*-] ", line)
         path = pathlib.Path(path_str)
         if path.stat().st_size <= 1000:
@@ -60,7 +60,9 @@ def main(act=False):
         print(f"保留: {keeppath}, \n删除: {deletepath}")
         if act:
             file_obj.path = str(keeppath)
-            os.unlink(deletepath)
+            file_obj.save()
+            if deletepath.exists():
+                os.unlink(deletepath)
 
 
 if __name__ == "__main__":
