@@ -32,6 +32,9 @@ def main(count=1000):
                 print(f"    local file {file_obj.path} exist")
                 print("    delete remote file")
                 os.unlink(cloud_file)
+            else:
+                print(f"    this file should be rehandle")
+                file_obj.delete_instance()
             continue
         directory = BACK_PATH.joinpath(str(st_ctime.year)).joinpath(str(st_ctime.month))
         if not directory.exists():

@@ -47,5 +47,6 @@ since we can only get the stat info from icloud directory before download. I use
 3. delete duplicate file
 
 
+    python icloud_windows_sync/update_sha.py
     python icloud_windows_sync/delete_duplicate_file.py
     # you can add your customer rule to determine which file to delete

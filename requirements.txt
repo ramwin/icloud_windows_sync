@@ -1,3 +1,4 @@
 peewee
 gitpython
 diff-match-patch
+Pillow
