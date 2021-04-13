@@ -19,11 +19,17 @@ def keep_and_delete(path0, path1):
         return path0, path1
     elif "icloud" in str_path_0 and "icloud" not in str_path_1:
         return path1, path0
-    year_month_pattern = r"/\d{4}/\d{1,2}/"
-    if re.match(year_month_pattern, str_path_0) and not re.match(year_month_pattern, str_path_1):
+    year_month_pattern = r".*/(?P<year>\d{4})/(?P<month>\d{1,2})"
+    match_0 = re.match(year_month_pattern, str_path_0.replace("\\", "/"))
+    match_1 = re.match(year_month_pattern, str_path_1.replace("\\", "/"))
+    if match_0 and (not match_1):
         return path0, path1
-    elif re.match(year_month_pattern, str_path_1) and not re.match(year_month_pattern, str_path_0):
+    elif match_1 and (not match_0):
         return path1, path0
+    if (not match_0) and (not match_1):
+        import pdb
+        pdb.set_trace()
+        raise Exception("我不懂")
     if str(path0.parent) == str(path1.parent):
         if len(path0.stem) > len(path1.stem):
             return path1, path0
@@ -54,7 +60,7 @@ def main(act=False):
             continue
         result = keep_and_delete(path, pathlib.Path(file_obj.path))
         if not result:
-            print(f"报错 {path}")
+            print(f"报错 {path}, {file_obj.path}")
             continue
         keeppath, deletepath = keep_and_delete(path, pathlib.Path(file_obj.path) )
         print(f"保留: {keeppath}, \n删除: {deletepath}")
