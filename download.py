@@ -15,7 +15,7 @@ import model
 
 
 
-def main(count=100):
+def main(count=1000):
     for cloud_file in CLOUD_PATH.iterdir():
         print(f"INFO: handling {cloud_file}")
         count -= 1
@@ -27,8 +27,10 @@ def main(count=100):
         st_size = cloud_file.stat().st_size
         file_obj, created = model.File.get_or_create(st_ctime=st_ctime, st_size=st_size)
         if created is False:
-            print("File {cloud_file} handled before")
+            print("    File {cloud_file} handled before")
             if file_obj.path or file_obj.is_del:
+                print(f"    local file {file_obj.path} exist")
+                print("    delete remote file")
                 os.unlink(cloud_file)
             continue
         directory = BACK_PATH.joinpath(str(st_ctime.year)).joinpath(str(st_ctime.month))
@@ -40,13 +42,19 @@ def main(count=100):
         else:
             print(f"    luck, file exist")
         if local_file.stat().st_size == cloud_file.stat().st_size:
-            file_obj.st_size = local_file.stat().st_size
-            file_obj.path = local_file.absolute()
-            file_obj.save()
+            if model.File.filter(path=str(local_file.absolute())).exists():
+                file_obj_new = model.File.get(path=str(local_file.absolute()))
+                file_obj_new.st_ctime = file_obj.st_ctime
+                file_obj_new.save()
+                file_obj.delete_instance()
+            else:
+                file_obj.st_size = local_file.stat().st_size
+                file_obj.path = local_file.absolute()
+                file_obj.save()
             os.unlink(cloud_file)
             print(f"    SUCCESS: file copied to {local_file}")
         else:
-            print(f"ERROR: file is different: {local_file}")
+            raise(f"ERROR: file is different: {local_file}")
     model.db.close()
 
 

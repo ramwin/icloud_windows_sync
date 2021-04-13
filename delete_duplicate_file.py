@@ -1,75 +1,95 @@
 import os
 import pathlib
-import git
-from model import *
+from model import File
 import datetime
+import update_sha
 import logging
 import re
 
 
-git_obj = git.cmd.Git()
+class BaseRule:
 
-def keep_and_delete(path0, path1):
+    def __init__(self):
+        pass
+
+    def __call__(self, file0, file1):
+        """
+        return [keep_path, delete_path]
+        """
+        path0_weight = self.get_weight(pathlib.Path(file0.path))
+        path1_weight = self.get_weight(pathlib.Path(file1.path))
+        if path0_weight == path1_weight:
+            return None
+        elif path0_weight > path1_weight:
+            return file0, file1
+        else:
+            return file1, file0
+
+    def get_weight(self, path):
+        raise NotImplementedError("please change this function")
+
+
+class IcloudFirstRule(BaseRule):
+
+    def get_weight(self, path):
+        if "icloud" in str(path):
+            return 1
+        return 0
+
+
+class MatchYearMonthRule(BaseRule):
+
+    def get_weight(self, path):
+        year_month_pattern = r".*/(?P<year>\d{4})/(?P<month>\d{1,2})"
+        if re.match(year_month_pattern, str(path).replace("\\", "/")):
+            return 1
+        return 0
+
+
+class ShortNameRule(BaseRule):
+
+    def __call__(self, file0, file1):
+        if pathlib.Path(file0.path).absolute().parent != \
+                pathlib.Path(file1.path).absolute().parent:
+            return None
+        return super().__call__(path0, path1)
+
+    def get_weight(self, path):
+        return -len(path.stem)
+
+
+rules = [
+    IcloudFirstRule(),
+    MatchYearMonthRule(),
+    ShortNameRule(),
+]
+
+def keep_and_delete(path0, path1, rules):
     """
     return         keeppath: path0,       deletepath: path1
     """
-    str_path_0 = str(path0)
-    str_path_1 = str(path1)
-    if "icloud" in str_path_0 and "icloud" not in str_path_1:
-        return path0, path1
-    elif "icloud" in str_path_0 and "icloud" not in str_path_1:
-        return path1, path0
-    year_month_pattern = r".*/(?P<year>\d{4})/(?P<month>\d{1,2})"
-    match_0 = re.match(year_month_pattern, str_path_0.replace("\\", "/"))
-    match_1 = re.match(year_month_pattern, str_path_1.replace("\\", "/"))
-    if match_0 and (not match_1):
-        return path0, path1
-    elif match_1 and (not match_0):
-        return path1, path0
-    if (not match_0) and (not match_1):
-        import pdb
-        pdb.set_trace()
-        raise Exception("我不懂")
-    if str(path0.parent) == str(path1.parent):
-        if len(path0.stem) > len(path1.stem):
-            return path1, path0
-        elif len(path0.stem) < len(path1.stem):
-            return path0, path1    
+    for rule in rules:
+        if rule(path0, path1):
+            return rule(path0, path1)
+    raise Exception("I don't know which to delete")
 
-def main(act=False):
-    cnt = 0
-    result = git_obj.execute('git lfs ls-files -l')
-    for line in result.split("\n"):
-        # print(f"处理{line}")
-        cnt += 1
-        if cnt % 100 == 0:
-            print(f"当前处理了 {cnt}")
-        sha, path_str = re.split(r" [*-] ", line)
-        path = pathlib.Path(path_str)
-        if path.stat().st_size <= 1000:
-            continue
-        file_obj, created = File.get_or_create(
-            sha256sum=sha,
-            defaults={
-                "path": path_str,
-                "st_size": path.stat().st_size,
-                "st_ctime": datetime.datetime.fromtimestamp(path.stat().st_ctime),
-            }
-        )
-        if created or pathlib.Path(file_obj.path) == path:
-            continue
-        result = keep_and_delete(path, pathlib.Path(file_obj.path))
-        if not result:
-            print(f"报错 {path}, {file_obj.path}")
-            continue
-        keeppath, deletepath = keep_and_delete(path, pathlib.Path(file_obj.path) )
-        print(f"保留: {keeppath}, \n删除: {deletepath}")
-        if act:
-            file_obj.path = str(keeppath)
-            file_obj.save()
-            if deletepath.exists():
-                os.unlink(deletepath)
+
+def main():
+    for item in File.raw("select sha256sum, count(id) total from file where sha256sum is not null and is_del = False group by sha256sum having total > 2"):
+        sha256sum = item.sha256sum
+        files = [file_obj for file_obj in File.filter(sha256sum=sha256sum, is_del=False)]
+        while len(files) >= 2:
+            keep_file, delete_file = keep_and_delete(
+                files[0],
+                files[1],
+                rules)
+            print(f"    delete: {delete_file.path}")
+            print(f"      keep: {keep_file.path}")
+            delete_file.is_del = True
+            delete_file.save()
+            os.unlink(delete_file.path)
+            files.remove(delete_file)
 
 
 if __name__ == "__main__":
-    main(act=True)
+    main()
