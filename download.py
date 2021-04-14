@@ -57,7 +57,7 @@ def main(count=1000):
             os.unlink(cloud_file)
             print(f"    SUCCESS: file copied to {local_file}")
         else:
-            raise(f"ERROR: file is different: {local_file}")
+            raise Exception(f"ERROR: file is different: {local_file}")
     model.db.close()
 
 
