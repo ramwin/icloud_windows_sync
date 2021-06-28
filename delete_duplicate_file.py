@@ -6,6 +6,8 @@ import datetime
 import update_sha
 import logging
 import re
+from decimal import Decimal
+from log import logger
 
 
 class BaseRule:
@@ -82,12 +84,32 @@ class TimeOlderRule(BaseRule):
             return - int(match.groupdict()["year"]) * 12 - int(match.groupdict()["month"])
 
 
+class KeepOriginNameRule(BaseRule):
+
+    def __call__(self, file0, file1):
+        if pathlib.Path(file0.path).absolute().parent != \
+                pathlib.Path(file1.path).absolute().parent:
+            return None
+        return super().__call__(file0, file1)
+
+    def get_weight(self, path):
+        logger.info(path)
+        match = re.match(r".*\((?P<alias>[1-3])\)\.\S*", path.name)
+        if match is None:
+            result = Decimal("inf")
+        else:
+            result = -Decimal(match.groupdict()["alias"])
+        logging.info(result)
+        return result
+
+
 rules = [
     IcloudFirstRule(),
     MatchYearMonthRule(),
     ShortNameRule(),
     ImgtimeRule(),
     TimeOlderRule(),
+    KeepOriginNameRule(),
 ]
 
 def keep_and_delete(path0, path1, rules):
@@ -98,7 +120,7 @@ def keep_and_delete(path0, path1, rules):
         # print(f"use {type(rule)}")
         if rule(path0, path1):
             return rule(path0, path1)
-    raise Exception(f"I don't know which to delete: \n    {path0}\n    {path1}")
+    raise Exception(f"I don't know which to delete: \n    {path0.path}\n    {path1.path}")
 
 
 def main():
