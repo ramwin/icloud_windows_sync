@@ -33,10 +33,9 @@ since we can only get the stat info from icloud directory before download. I use
 3. init database
 
 
-    python
-    >>> from icloud_windows_sync.model import File, db
+    $ python
+    from icloud_windows_sync.model import File, db
     db.create_tables([File])
-
 
 4. download file
 
